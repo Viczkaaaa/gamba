@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Gamba Overlay - k_urwier</title>
+  <style>
+    body { 
+      margin: 0; 
+      background: transparent; 
+      overflow: hidden; 
+      font-family: Arial, sans-serif; 
+    }
+    #slotContainer {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+    }
+    .slots {
+      display: flex;
+      gap: 20px;
+      background: linear-gradient(45deg, #111, #333);
+      padding: 40px;
+      border-radius: 25px;
+      border: 6px solid #ffd700;
+      box-shadow: 0 0 40px #ffd700, inset 0 0 20px rgba(255,215,0,0.1);
+    }
+    .reel {
+      width: 160px; 
+      height: 160px; 
+      background: #000; 
+      border: 4px solid #fff; 
+      border-radius: 15px; 
+      overflow: hidden; 
+      font-size: 100px; 
+      line-height: 160px; 
+      text-align: center; 
+      color: #fff;
+      position: relative;
+    }
+    .reel.spinning::after {
+      content: '';
+      position: absolute;
+      top: -50%; left: 0; right: 0; bottom: -50%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(255,255,255,0.1) 49px, rgba(255,255,255,0.1) 50px);
+      animation: spin 0.1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(-50px) rotate(360deg); }
+    }
+    #winner { 
+      font-size: 50px; 
+      color: #ffd700; 
+      margin: 30px; 
+      text-shadow: 0 0 20px #ffd700; 
+      min-height: 80px;
+      text-align: center;
+    }
+    .confetti {
+      position: fixed;
+      width: 10px; height: 10px;
+      pointer-events: none;
+      z-index: 10000;
+      animation: confetti-fall 3s linear forwards;
+    }
+    @keyframes confetti-fall {
+      to { 
+        transform: translateY(100vh) rotate(720deg); 
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="slotContainer">
+    <h1 style="color: #ffd700; font-size: 48px; margin: 20px; text-shadow: 0 0 10px #ffd700;">🎰 @USER kręci na kanale k_urwier! 🎰</h1>
+    <div class="slots">
+      <div class="reel" id="r1">🎰</div>
+      <div class="reel" id="r2">🎰</div>
+      <div class="reel" id="r3">🎰</div>
+    </div>
+    <div id="winner"></div>
+  </div>
+
+  <script src="https://emulator.streamscharts.com/widget.js"></script>
+  <script>
+    const symbols = ["🍒", "🍋", "🍊", "7️⃣", "💎", "🍉", "🔔", "⭐", "🍀", "👑"];
+    const container = document.getElementById('slotContainer');
+    const reels = ['r1', 'r2', 'r3'].map(id => document.getElementById(id));
+    const winnerText = document.getElementById('winner');
+    let currentUser = '';
+
+    // Nasłuchujemy na czat (działa tylko na kanale k_urwier)
+    const widget = StreamschartsWidget.init({
+      channel: 'k_urwier',
+      onMessage: (message) => {
+        if (message.command === '!gamba' && message.username) {
+          currentUser = message.username;
+          startGamba();
+        }
+      }
+    });
+
+    function startGamba() {
+      container.style.display = 'flex';
+      // Update nick
+      document.querySelector('h1').textContent = `🎰 ${currentUser} kręci na kanale k_urwier! 🎰`;
+
+      // Reset
+      reels.forEach(r => {
+        r.textContent = '🎰';
+        r.classList.add('spinning');
+      });
+      winnerText.textContent = '';
+
+      // Kręcimy bębny po kolei
+      let delay = 1000;
+      reels.forEach((reel, i) => {
+        setTimeout(() => spinReel(reel, i), delay + i * 500);
+      });
+    }
+
+    function spinReel(reel, index) {
+      let spins = 0;
+      const spinInterval = setInterval(() => {
+        reel.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        spins++;
+        if (spins > 20 + index * 10) {
+          clearInterval(spinInterval);
+          const final = symbols[Math.floor(Math.random() * symbols.length)];
+          reel.textContent = final;
+          reel.classList.remove('spinning');
+
+          // Jak ostatni bęben – wynik
+          if (index === 2) {
+            setTimeout(() => showResult(), 600);
+          }
+        }
+      }, 100);
+    }
+
+    function showResult() {
+      const s = reels.map(r => r.textContent);
+      let msg = `${s.join(' ')}<br>`;
+      let win = false;
+
+      if (s[0] === s[1] && s[1] === s[2]) {
+        msg += `JACKPOT! ${currentUser} WYGRYWA 5000 PUNKTÓW! 💰💰💰`;
+        confettiRain(200);
+        win = true;
+      } else if (s[0] === s[1] || s[1] === s[2] || s[0] === s[2]) {
+        msg += `Mała wygrana! ${currentUser} dostaje 1000 punktów! 🎉`;
+        confettiRain(50);
+        win = true;
+      } else {
+        msg += `${currentUser}... niestety lipa tym razem 😭`;
+      }
+
+      winnerText.innerHTML = msg;
+
+      // Znikamy po 8s
+      setTimeout(() => {
+        container.style.display = 'none';
+      }, 8000);
+    }
+
+    function confettiRain(count) {
+      for (let i = 0; i < count; i++) {
+        const conf = document.createElement('div');
+        conf.className = 'confetti';
+        conf.style.left = Math.random() * 100 + 'vw';
+        conf.style.background = ['#ffd700', '#ff0000', '#00ff00', '#0000ff', '#ffff00'][Math.floor(Math.random() * 5)];
+        conf.style.animationDelay = Math.random() * 2 + 's';
+        document.body.appendChild(conf);
+        setTimeout(() => conf.remove(), 4000);
+      }
+    }
+  </script>
+</body>
+</html>
